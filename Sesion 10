@@ -1,0 +1,171 @@
+import numpy as np
+from sklearn.svm import SVC
+
+NOMBRE_CLASE = {0: "A (círculos)", 1: "B (equis)"}
+
+
+def describir(titulo, modelo, X, Y):
+    """Imprime lo importante de un modelo ya entrenado."""
+    print("\n" + "=" * 66)
+    print(titulo)
+    print("=" * 66)
+    print(f"   Vectores de soporte: {modelo.support_vectors_.astype(int).tolist()}")
+
+    if modelo.kernel == "linear":
+        w = modelo.coef_[0]
+        b = modelo.intercept_[0]
+        signo = "+" if b >= 0 else "-"
+        print(f"   Recta aprendida: {w[0]:.3f}·x + {w[1]:.3f}·y {signo} {abs(b):.3f} = 0")
+        # Cuando los dos pesos son casi iguales, la recta se puede leer como x + y = c
+        if abs(w[0] - w[1]) < 0.01 * abs(w[0]):
+            print(f"   Dicho más simple:  x + y = {-b / w.mean():.2f}")
+        print(f"   Ancho de la calle: {2 / np.linalg.norm(w):.2f}")
+
+    print(f"   Exactitud sobre los datos de entrenamiento: {modelo.score(X, Y):.0%}")
+
+
+def predecir(modelo, punto):
+    """Predice un punto y muestra qué tan lejos quedó de la frontera."""
+    valor = modelo.decision_function([punto])[0]
+    clase = modelo.predict([punto])[0]
+    print(f"   El punto {punto} pertenece a la clase {clase} = {NOMBRE_CLASE[clase]}"
+          f"   (valor de decisión: {valor:+.5f})")
+    return valor
+
+
+# =============================================================================
+# PUNTO 1. Código original del PDF
+# =============================================================================
+X = np.array([[2, 2], [3, 3], [4, 2], [6, 6], [7, 8], [8, 7]])
+Y = np.array([0, 0, 0, 1, 1, 1])
+
+modelo_svm = SVC(kernel="linear")
+modelo_svm.fit(X, Y)
+describir("PUNTO 1 - CÓDIGO ORIGINAL (kernel lineal)", modelo_svm, X, Y)
+
+valor = predecir(modelo_svm, [5, 4])
+print("   OJO: 5 + 4 = 9, así que [5, 4] cae justo ENCIMA de la frontera x + y = 9.")
+print("   El valor de decisión es prácticamente 0: es un empate, y el 0 que")
+print("   imprime el modelo sale de redondeos internos del optimizador.")
+
+
+# =============================================================================
+# EXTRA (pregunta 3 del taller analítico). ¿Mover la línea con el punto (1,1)?
+# =============================================================================
+X_con_11 = np.vstack([X, [1, 1]])
+Y_con_11 = np.append(Y, 0)
+modelo_11 = SVC(kernel="linear").fit(X_con_11, Y_con_11)
+describir("EXTRA - SE AGREGA EL PUNTO (1,1) A LA CLASE A", modelo_11, X_con_11, Y_con_11)
+print("   La recta sigue siendo x + y = 9: el punto (1,1) está lejos de la calle,")
+print("   no es vector de soporte y por eso no mueve nada. (Las diferencias en el")
+print("   cuarto decimal son redondeos del optimizador, no un cambio real.)")
+
+
+# =============================================================================
+# PUNTOS 2 y 3. "Engañar" a la frontera: [5, 5] con etiqueta 0 (clase A)
+# =============================================================================
+X_engano = np.vstack([X, [5, 5]])
+Y_engano = np.append(Y, 0)
+
+modelo_lineal = SVC(kernel="linear").fit(X_engano, Y_engano)
+describir("PUNTOS 2 y 3 - SE AGREGA [5,5] COMO CLASE A (kernel lineal)",
+          modelo_lineal, X_engano, Y_engano)
+predecir(modelo_lineal, [5, 4])
+print("   La recta NO falla (sigue separando el 100%), pero queda forzada:")
+print("   se corre de x + y = 9 a x + y = 11 y la calle se encoge a un tercio.")
+
+
+# =============================================================================
+# PUNTO 4. Cambiar a kernel RBF
+# =============================================================================
+modelo_rbf = SVC(kernel="rbf").fit(X_engano, Y_engano)
+describir("PUNTO 4 - MISMOS DATOS CON KERNEL RBF", modelo_rbf, X_engano, Y_engano)
+predecir(modelo_rbf, [5, 4])
+print("   Ahora la frontera es una curva que rodea a los grupos en vez de una recta.")
+
+
+# =============================================================================
+# EXTRA. Un punto REALMENTE rodeado: [7, 7] como clase A, en medio de las equis
+# =============================================================================
+X_rodeado = np.vstack([X, [7, 7]])
+Y_rodeado = np.append(Y, 0)
+
+lineal_rodeado = SVC(kernel="linear").fit(X_rodeado, Y_rodeado)
+describir("EXTRA - [7,7] COMO CLASE A, RODEADO POR LA CLASE B (kernel lineal)",
+          lineal_rodeado, X_rodeado, Y_rodeado)
+print("   Aquí la recta SÍ falla: ninguna línea recta puede dejar a [7,7] del")
+print("   lado de los círculos sin llevarse también alguna equis.")
+
+rbf_defecto = SVC(kernel="rbf").fit(X_rodeado, Y_rodeado)
+describir("EXTRA - EL MISMO CASO CON RBF Y PARÁMETROS POR DEFECTO",
+          rbf_defecto, X_rodeado, Y_rodeado)
+gamma_defecto = 1 / (X_rodeado.shape[1] * X_rodeado.var())
+print(f"   Por defecto gamma = {gamma_defecto:.2f} y C = 1: la curva es demasiado")
+print("   suave y el modelo prefiere equivocarse con [7,7] antes que doblarse tanto.")
+
+rbf_ajustado = SVC(kernel="rbf", gamma=0.5, C=10).fit(X_rodeado, Y_rodeado)
+describir("EXTRA - RBF AJUSTADO (gamma=0.5, C=10)", rbf_ajustado, X_rodeado, Y_rodeado)
+print("   gamma más alto = curvas más cerradas, capaces de encerrar un solo punto.")
+print("   C más alto     = el modelo tolera menos errores de entrenamiento.")
+print("   Hacen falta los dos: con gamma=0.5 pero C=1 todavía falla.")
+print("   Con ambos, el RBF le arma una 'isla' de clase A a [7,7] dentro de la B.")
+
+
+# =============================================================================
+# FIGURA: las cuatro fronteras lado a lado (se guarda como svm_fronteras.png)
+# =============================================================================
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("\n[matplotlib no está instalado: se omite la figura]")
+else:
+    COLOR_A, COLOR_B, COLOR_SV = "#1D9E75", "#7F77DD", "#E24B4A"
+
+    def dibujar(ax, modelo, Xd, Yd, titulo, punto_extra=None):
+        xx, yy = np.meshgrid(np.linspace(0, 10, 400), np.linspace(0, 10, 400))
+        Z = modelo.decision_function(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
+
+        # Regiones de cada clase y la frontera con los bordes de la calle
+        ax.contourf(xx, yy, Z, levels=[-1e9, 0, 1e9], colors=[COLOR_A, COLOR_B], alpha=0.12)
+        ax.contour(xx, yy, Z, levels=[0], colors="#2C2C2A", linewidths=2)
+        ax.contour(xx, yy, Z, levels=[-1, 1], colors="#5F5E5A",
+                   linewidths=1, linestyles="--")
+
+        # Puntos de cada clase
+        a, b = Xd[Yd == 0], Xd[Yd == 1]
+        ax.scatter(a[:, 0], a[:, 1], s=70, c=COLOR_A, marker="o", zorder=3, label="Clase A")
+        ax.scatter(b[:, 0], b[:, 1], s=90, c=COLOR_B, marker="x", linewidths=2.5,
+                   zorder=3, label="Clase B")
+
+        # Vectores de soporte con círculo rojo, como en el cuaderno
+        sv = modelo.support_vectors_
+        ax.scatter(sv[:, 0], sv[:, 1], s=320, facecolors="none", edgecolors=COLOR_SV,
+                   linewidths=1.8, zorder=4, label="Vector de soporte")
+
+        if punto_extra is not None:
+            ax.annotate("nuevo", xy=punto_extra, xytext=(punto_extra[0] - 1.6, punto_extra[1] + 1.2),
+                        fontsize=9, arrowprops=dict(arrowstyle="->", color="#5F5E5A"))
+
+        ax.set_title(titulo, fontsize=11)
+        ax.set_xlim(0, 10)
+        ax.set_ylim(0, 10)
+        ax.set_aspect("equal")
+        ax.grid(alpha=0.25)
+
+    fig, ejes = plt.subplots(2, 2, figsize=(11, 11))
+    dibujar(ejes[0, 0], modelo_svm, X, Y,
+            "1. Original, kernel lineal\nx + y = 9, calle de 4.24")
+    dibujar(ejes[0, 1], modelo_lineal, X_engano, Y_engano,
+            "2. Con [5,5] como clase A, kernel lineal\nx + y = 11, calle de 1.41", [5, 5])
+    dibujar(ejes[1, 0], modelo_rbf, X_engano, Y_engano,
+            "3. Con [5,5] como clase A, kernel RBF\nla frontera se curva", [5, 5])
+    dibujar(ejes[1, 1], rbf_ajustado, X_rodeado, Y_rodeado,
+            "4. Extra: [7,7] rodeado, RBF (gamma=0.5, C=10)\nle arma una isla", [7, 7])
+
+    ejes[0, 0].legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    fig.savefig("svm_fronteras.png", dpi=110)
+    print("\nFigura guardada como svm_fronteras.png")
+
