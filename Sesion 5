@@ -1,0 +1,122 @@
+#   COG = Σ (x · μ(x)) / Σ μ(x)
+
+
+import numpy as np
+
+
+# PUNTO 1. Función del Centroide con operaciones matriciales de NumPy
+def centroide(x, curva):
+    """
+    Defuzzificación por Centro de Gravedad (COG).
+
+    x     : arreglo con el universo del discurso (eje X)
+    curva : arreglo con los grados de membresía μ(x) en cada punto
+
+    Retorna el valor crisp. NumPy multiplica elemento a elemento, así que
+    x * curva calcula todos los productos de un solo golpe, sin ciclos for.
+    """
+    x = np.asarray(x, dtype=float)
+    curva = np.asarray(curva, dtype=float)
+
+    numerador = np.sum(x * curva)      # Σ (x · μ(x))
+    denominador = np.sum(curva)        # Σ μ(x)  -> área total
+
+    if denominador == 0:
+        raise ValueError("Área total = 0: ninguna regla se activó.")
+
+    return numerador / denominador
+
+
+# PUNTO 2. Validación con los datos del Taller Analítico
+def validar_contra_el_papel():
+    x = np.array([10, 20, 30, 40])
+    mu = np.array([0.2, 0.8, 0.8, 0.0])
+
+    numerador = np.sum(x * mu)
+    denominador = np.sum(mu)
+    resultado = centroide(x, mu)
+
+    print("=" * 62)
+    print("PUNTO 2 - VALIDACIÓN CONTRA EL TALLER ANALÍTICO")
+    print("=" * 62)
+    print(f"   x  = {x}")
+    print(f"   mu = {mu}")
+    print(f"\n   Numerador   Σ(x·μ) = {numerador}")
+    print(f"   Denominador Σ(μ)   = {denominador}")
+    print(f"   COG = {numerador} / {denominador} = {resultado:.4f}")
+    print(f"\n   >> Descuento recomendado: {resultado:.2f} %")
+
+    # Comprobación automática contra el valor calculado a mano (42 / 1.8)
+    assert abs(resultado - 42 / 1.8) < 1e-9, "La función no coincide con el papel"
+    print("   >> Coincide con el cálculo manual.")
+
+
+# PUNTO 3 y 4. Escenario nuevo: frenado automático de un automóvil
+def escenario_frenado():
+    # Universo del discurso: fuerza de frenado de 0 a 100 Newtons, 100 elementos
+    x_fuerza = np.linspace(0, 100, 100)
+
+    # Conjunto difuso "Frenado FUERTE": campana de Gauss centrada en 70 N
+    centro = 70.0
+    sigma = 10.0
+    curva_gauss = np.exp(-((x_fuerza - centro) ** 2) / (2 * sigma ** 2))
+
+    print("\n" + "=" * 62)
+    print("PUNTOS 3 y 4 - SISTEMA DE FRENADO AUTOMÁTICO")
+    print("=" * 62)
+    print(f"   Universo: {x_fuerza[0]:.0f} a {x_fuerza[-1]:.0f} N "
+          f"({len(x_fuerza)} elementos)")
+    print(f"   Conjunto 'Frenado FUERTE': gaussiana centro={centro:.0f}, "
+          f"sigma={sigma:.0f}")
+
+    fuerza_crisp = centroide(x_fuerza, curva_gauss)
+    print(f"\n   >> Fuerza de frenado exacta (curva completa): "
+          f"{fuerza_crisp:.4f} N")
+
+    # --- Pipeline Mamdani completo: la regla se activó con fuerza 0.6 --------
+    # El conjunto de salida se trunca a esa altura antes de defuzzificar
+    activacion = 0.6
+    curva_truncada = np.fmin(curva_gauss, activacion)
+    fuerza_truncada = centroide(x_fuerza, curva_truncada)
+
+    print(f"\n   Si la regla se activó con fuerza {activacion}:")
+    print(f"   >> Fuerza de frenado tras truncar: {fuerza_truncada:.4f} N")
+    print("   Nota: truncar una campana simétrica le quita altura, no la")
+    print("   desplaza, por eso el centro de gravedad casi no se mueve.")
+
+    return x_fuerza, curva_gauss, curva_truncada
+
+
+# -----------------------------------------------------------------------------
+# EXTRA. Contraste con scikit-fuzzy (si está instalado)
+# -----------------------------------------------------------------------------
+def comparar_con_skfuzzy(x_fuerza, curva_gauss):
+    try:
+        import skfuzzy as fuzz
+    except ImportError:
+        print("\n[skfuzzy no está instalado - se omite la comparación]")
+        print("Para instalarlo: pip install scikit-fuzzy")
+        return
+
+    print("\n" + "=" * 62)
+    print("EXTRA - CONTRASTE CON scikit-fuzzy")
+    print("=" * 62)
+
+    # Misma campana, pero construida con la utilidad de la librería
+    curva_lib = fuzz.gaussmf(x_fuerza, 70, 10)
+
+    propio = centroide(x_fuerza, curva_lib)
+    libreria = fuzz.defuzz(x_fuerza, curva_lib, 'centroid')
+
+    print(f"   Mi función centroide()     : {propio:.6f} N")
+    print(f"   fuzz.defuzz(..., 'centroid'): {libreria:.6f} N")
+    print(f"   Diferencia                  : {abs(propio - libreria):.6f} N")
+    print("   (skfuzzy integra con la regla del trapecio; mi versión suma")
+    print("   puntos discretos. Con un muestreo fino ambas convergen.)")
+
+
+# -----------------------------------------------------------------------------
+if __name__ == "__main__":
+    validar_contra_el_papel()
+    x_fuerza, curva_gauss, _ = escenario_frenado()
+    comparar_con_skfuzzy(x_fuerza, curva_gauss)
