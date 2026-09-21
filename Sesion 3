@@ -1,0 +1,96 @@
+def membresia_triangular(x, a, b, c):
+    """
+    Devuelve el grado de verdad de x dentro del triángulo (a, b, c).
+
+        μ(x) = 0                  si x <= a  o  x >= c
+        μ(x) = (x - a) / (b - a)  si a < x <= b   (rampa de subida)
+        μ(x) = (c - x) / (c - b)  si b < x <  c   (rampa de bajada)
+
+    Los dos primeros 'if' manejan los triángulos degenerados: cuando a == b
+    (como en Novato) o b == c, un lado del triángulo es vertical. Sin ellos
+    Python lanzaría ZeroDivisionError o devolvería 0.0 justo en el pico.
+    """
+   
+    if x <= a or x >= c:
+        return 0.0
+
+    if x == b:
+        return 1.0
+
+    if a < x < b:
+        return (x - a) / (b - a)   
+    else:
+        return (c - x) / (c - b)  
+
+
+conjuntos_experiencia = {
+    "NOVATO":     (0,  0,  5),
+    "INTERMEDIO": (2,  5,  8),
+    "EXPERTO":    (5, 10, 20),
+}
+
+
+def fuzzificar(anios):
+    """Convierte un valor crisp (años) en un diccionario de grados de verdad."""
+    return {
+        nombre: membresia_triangular(anios, a, b, c)
+        for nombre, (a, b, c) in conjuntos_experiencia.items()
+    }
+
+
+# PUNTOS 2, 3 y 4. 
+
+conductores = [3, 6, 12]
+
+print("=" * 64)
+print("FUZZIFICACIÓN DE LA EXPERIENCIA DE LOS CONDUCTORES")
+print("=" * 64)
+
+resumen = []
+
+for anios in conductores:
+
+    grados = fuzzificar(anios)
+
+    print(f"\nConductor con {anios} años de experiencia:")
+    for categoria, grado in grados.items():
+        barra = "#" * int(round(grado * 30))
+        print(f"   {categoria:<12} μ = {grado:.4f}  ({grado:6.1%}) {barra}")
+
+    # PUNTO 4: la categoría dominante es la de mayor grado de verdad.
+
+    categoria_dominante = max(grados, key=grados.get)
+    grado_maximo = grados[categoria_dominante]
+
+    print(f"   -> Encaja mejor en: {categoria_dominante} "
+          f"(grado {grado_maximo:.4f})")
+
+    resumen.append((anios, categoria_dominante, grado_maximo, sum(grados.values())))
+
+
+# Tabla final
+
+print("\n" + "=" * 64)
+print("RESUMEN")
+print("=" * 64)
+print(f"   {'Años':<8}{'Categoría':<14}{'Grado':<10}{'Suma de grados'}")
+for anios, categoria, grado, suma in resumen:
+    print(f"   {anios:<8}{categoria:<14}{grado:<10.4f}{suma:.4f}")
+
+print("\n   Nota: la suma de los grados NO da 1. Los grados de membresía no")
+print("   son probabilidades; miden vaguedad, no azar. Un conductor puede")
+print("   ser 0.40 novato y 0.33 intermedio al mismo tiempo sin contradicción.")
+
+
+# --Extra
+
+print("\n" + "=" * 64)
+print("VALIDACIÓN CON EL TALLER ANALÍTICO: 'TEMPERATURA AGRADABLE' (18,22,26)")
+print("=" * 64)
+
+for temperatura, esperado in [(20, 0.50), (25, 0.25)]:
+    grado = membresia_triangular(temperatura, 18, 22, 26)
+    print(f"   μ({temperatura}°C) = {grado:.4f}   (a mano: {esperado})")
+    assert abs(grado - esperado) < 1e-9, "No coincide con el cálculo manual"
+
+print("   >> Ambos coinciden con el cálculo hecho en papel.")
