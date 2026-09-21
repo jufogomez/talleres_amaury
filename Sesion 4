@@ -1,0 +1,82 @@
+# --resultado de la etapa de Fuzzificación
+
+grados = {
+    
+    "desempeno_pobre":     0.10,
+    "desempeno_promedio":  0.45,
+    "desempeno_excelente": 0.85,
+
+    "antiguedad_corta":    0.30,
+    "antiguedad_larga":    0.60,
+}
+
+
+# 2.
+def evaluar_reglas_bono(grados):
+    """
+    Evalúa las 3 reglas difusas del sistema de bonos.
+    Retorna un diccionario con el nivel de activación de cada conclusión.
+    """
+
+    # R1: SI Desempeño es POBRE  O  Antigüedad es CORTA  ENTONCES Bono = BAJO
+    # El OR es una T-Conorma -> se modela con max()
+    activacion_r1 = max(grados["desempeno_pobre"],
+                        grados["antiguedad_corta"])
+
+    # R2: SI Desempeño es PROMEDIO  ENTONCES Bono = MEDIO
+    # Premisa simple: la fuerza es directamente el grado de membresía
+    activacion_r2 = grados["desempeno_promedio"]
+
+    # R3: SI Desempeño es EXCELENTE  Y  Antigüedad es LARGA  ENTONCES Bono = ALTO
+    # El AND es una T-Norma -> se modela con min() (eslabón más débil)
+    activacion_r3 = min(grados["desempeno_excelente"],
+                        grados["antiguedad_larga"])
+
+    return {
+        "BAJO":  activacion_r1,
+        "MEDIO": activacion_r2,
+        "ALTO":  activacion_r3,
+    }
+
+
+# 3.
+def agregar(*fuerzas):
+    """
+    Paso de Agregación de Mamdani: cuando varias reglas concluyen en el
+    MISMO conjunto de salida, se unifican con la T-Conorma (OR) -> max().
+    """
+    return max(fuerzas)
+
+
+# 4. 
+if __name__ == "__main__":
+
+    fuerzas = evaluar_reglas_bono(grados)
+
+    print("=" * 60)
+    print("MOTOR DE INFERENCIA DIFUSO - BONO ANUAL")
+    print("=" * 60)
+    print("\nGrados de membresía de entrada:")
+    for clave, valor in grados.items():
+        print(f"   {clave:<22} = {valor}")
+
+    print("\nFuerza de activación por conclusión:")
+    print(f"   {fuerzas}")
+
+    print("\nDetalle del cálculo:")
+    print(f"   R1 -> BAJO  : max({grados['desempeno_pobre']}, "
+          f"{grados['antiguedad_corta']}) = {fuerzas['BAJO']}")
+    print(f"   R2 -> MEDIO : {grados['desempeno_promedio']} "
+          f"= {fuerzas['MEDIO']}")
+    print(f"   R3 -> ALTO  : min({grados['desempeno_excelente']}, "
+          f"{grados['antiguedad_larga']}) = {fuerzas['ALTO']}")
+
+    # --- Pregunta teórica: dos reglas concluyen "Bono Alto" con 0.4 y 0.7 ---
+    bono_alto_final = max(0.4, 0.7)          # <-- línea de código pedida
+
+    print("\n" + "-" * 60)
+    print("PREGUNTA TEÓRICA (Agregación)")
+    print("-" * 60)
+    print("   Dos reglas concluyen 'Bono Alto' con fuerzas 0.4 y 0.7")
+    print(f"   bono_alto_final = max(0.4, 0.7) = {bono_alto_final}")
+    print("   La T-Conorma (OR) toma la evidencia MÁS FUERTE, no el promedio.")
