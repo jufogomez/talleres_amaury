@@ -1,0 +1,115 @@
+# Un perceptrón hace solo dos cosas:
+#   1. Suma ponderada:  Z = (X1 * W1) + (X2 * W2) + b
+#   2. Decide:          si Z >= 0 dispara 1; si no, 0
+#
+# Los pesos (W) dicen qué tan importante es cada entrada.
+# El sesgo (b) dice qué tan "exigente" es la neurona para disparar:
+# entre más negativo, más puntos necesitan las entradas para superarlo.
+
+
+import numpy as np
+
+# PUNTO 1. Código del PDF
+def funcion_escalon(z):
+    if z >= 0:
+        return 1
+    else:
+        return 0
+
+
+def perceptron(X, W, b):
+    Z = np.dot(X, W) + b          # producto punto + sesgo
+    salida = funcion_escalon(Z)
+    return salida
+
+# Las 4 combinaciones posibles de dos entradas binarias
+TABLA_ENTRADAS = [[0, 0], [0, 1], [1, 0], [1, 1]]
+
+SALIDAS_AND = [0, 0, 0, 1]   # solo [1, 1] da 1
+SALIDAS_OR  = [0, 1, 1, 1]   # solo [0, 0] da 0
+
+
+def probar_compuerta(nombre, pesos, sesgo, esperado):
+    """Pasa las 4 entradas por la neurona y las compara con lo esperado."""
+    pesos = np.array(pesos)
+    print(f"\n   {nombre}:  W = {pesos.tolist()},  b = {sesgo}")
+    print(f"   {'Entrada':<10}{'Z':>8}{'Salida':>9}{'Esperado':>11}")
+
+    todo_bien = True
+    for entrada, esperado_i in zip(TABLA_ENTRADAS, esperado):
+        X = np.array(entrada)
+        Z = np.dot(X, pesos) + sesgo
+        salida = perceptron(X, pesos, sesgo)
+        if salida != esperado_i:
+            todo_bien = False
+        marca = "ok" if salida == esperado_i else "FALLA"
+        print(f"   {str(entrada):<10}{Z:>8.2f}{salida:>9}{esperado_i:>11}   {marca}")
+
+    print(f"   >> {'RESUELVE la compuerta' if todo_bien else 'NO resuelve la compuerta'}")
+    return todo_bien
+
+# EXTRA. Validación del Taller Analítico (aprobación de crédito)
+
+print("=" * 64)
+print("TALLER ANALÍTICO - ¿SE APRUEBA EL CRÉDITO?")
+print("=" * 64)
+
+cliente = np.array([50, 20])          # [Ingresos, Deudas]
+W_credito = np.array([0.8, -0.5])
+b_credito = -10
+
+Z = np.dot(cliente, W_credito) + b_credito
+print(f"   Z = (50 x 0.8) + (20 x -0.5) + (-10)")
+print(f"   Z = 40 - 10 - 10 = {Z}")
+decision = perceptron(cliente, W_credito, b_credito)
+print(f"   Salida = {decision}  ->  {'APROBADO' if decision == 1 else 'RECHAZADO'}")
+
+# PUNTO 2. Verificar que el código original resuelve AND
+
+print("\n" + "=" * 64)
+print("PUNTO 2 - VERIFICACIÓN DE LA COMPUERTA AND (código original)")
+print("=" * 64)
+probar_compuerta("AND del PDF", [0.5, 0.5], -0.8, SALIDAS_AND)
+
+# PUNTOS 3 y 4. El reto: resolver OR
+
+print("\n" + "=" * 64)
+print("PUNTOS 3 y 4 - EL RETO: COMPUERTA OR")
+print("=" * 64)
+
+# Solución 1: dejar los pesos igual y bajar la exigencia (sesgo)
+probar_compuerta("OR, solución 1 (solo cambia el sesgo)", [0.5, 0.5], -0.3, SALIDAS_OR)
+
+# Solución 2: dejar el sesgo igual y subir el volumen de cada entrada (pesos)
+probar_compuerta("OR, solución 2 (solo cambian los pesos)", [1.0, 1.0], -0.8, SALIDAS_OR)
+
+
+# EXTRA. ¿Qué compuerta sale con cada sesgo? (pesos fijos en 0.5 y 0.5)
+
+print("\n" + "=" * 64)
+print("EXTRA - EL SESGO COMO PERILLA DE EXIGENCIA (W = [0.5, 0.5])")
+print("=" * 64)
+print(f"   {'b':>6} | salidas para [0,0] [0,1] [1,0] [1,1] | compuerta")
+
+for sesgo in [-1.2, -1.0, -0.8, -0.6, -0.5, -0.4, -0.3, -0.1, 0.0, 0.2]:
+    salidas = [perceptron(np.array(e), np.array([0.5, 0.5]), sesgo)
+               for e in TABLA_ENTRADAS]
+    if salidas == SALIDAS_AND:
+        nombre = "AND"
+    elif salidas == SALIDAS_OR:
+        nombre = "OR"
+    elif salidas == [0, 0, 0, 0]:
+        nombre = "siempre 0 (demasiado exigente)"
+    elif salidas == [1, 1, 1, 1]:
+        nombre = "siempre 1 (nada exigente)"
+    else:
+        nombre = "otra"
+    fila = "     ".join(str(s) for s in salidas)
+    print(f"   {sesgo:>6} |               {fila}       | {nombre}")
+
+# ---------
+print("\n" + "=" * 64)
+print("PUNTO 5 - RESPUESTA")
+print("=" * 64)
+print("   Pesos W = [0.5, 0.5] y sesgo b = -0.3 resuelven la compuerta OR.")
+print("   Sirve cualquier sesgo desde -0.5 hasta justo antes de 0.")
