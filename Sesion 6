@@ -1,0 +1,112 @@
+import numpy as np
+from sklearn.tree import DecisionTreeClassifier, export_text
+
+
+# -----------------------------------------------------------------------------
+# PUNTO 2. Dataset simulado del departamento de Marketing
+# -----------------------------------------------------------------------------
+# Columnas de X: [Edad, Horas_Online (por día), Compras_Previas]
+# Etiqueta Y   : 1 = hizo clic en el anuncio, 0 = lo ignoró
+#
+# Patrón lógico sembrado a propósito en los datos:
+#     hace clic  <=>  Horas_Online >= 4  Y  Compras_Previas >= 2
+# La Edad se incluye deliberadamente como variable RUIDOSA (no explica nada)
+# para comprobar si el árbol es capaz de descartarla solo.
+# -----------------------------------------------------------------------------
+X = np.array([
+    # Edad, Horas_Online, Compras_Previas
+    [22,  6,  3],
+    [25,  5,  4],
+    [31,  7,  2],
+    [28,  6,  5],
+    [45,  5,  3],
+    [38,  8,  6],
+    [55,  1,  0],
+    [47,  2,  1],
+    [33,  1,  2],
+    [29,  2,  0],
+    [61,  0,  1],
+    [24,  2,  4],
+    [52,  7,  0],
+    [26,  5,  0],
+])
+
+Y = np.array([1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+
+nombres_variables = ["Edad", "Horas_Online", "Compras_Previas"]
+nombres_clases = ["IGNORO_ANUNCIO", "HIZO_CLIC"]
+
+
+# PUNTO 3. Entrenamiento del árbol
+
+# criterion="entropy" para que use Ganancia de Información (lo visto en clase).
+# El default de sklearn es "gini", que llega a conclusiones parecidas pero mide
+# la impureza con otra fórmula.
+# max_depth limita la profundidad: sin él, el árbol memoriza hasta el ruido.
+arbol = DecisionTreeClassifier(criterion="entropy", max_depth=3, random_state=42)
+arbol.fit(X, Y)   # <-- aquí ocurre la "adquisición del conocimiento"
+
+
+# PUNTO 4.
+reglas_texto = export_text(arbol, feature_names=nombres_variables)
+
+print("=" * 66)
+print("BASE DE REGLAS GENERADA AUTOMÁTICAMENTE POR LA IA")
+print("=" * 66)
+print(reglas_texto)
+
+
+# --variables
+print("=" * 66)
+print("IMPORTANCIA DE CADA VARIABLE (cuánta entropía eliminó)")
+print("=" * 66)
+for nombre, peso in zip(nombres_variables, arbol.feature_importances_):
+    barra = "#" * int(peso * 40)
+    print(f"   {nombre:<18} {peso:6.3f}  {barra}")
+
+
+# Traducción a lenguaje de Sistema Experto (SI ... ENTONCES)
+print("\n" + "=" * 66)
+print("LAS MISMAS REGLAS, REDACTADAS COMO LAS ESCRIBIRÍA UN EXPERTO")
+print("=" * 66)
+print("   R1: SI Horas_Online <= 3.5")
+print("       ENTONCES Cliente = IGNORA_EL_ANUNCIO")
+print("   R2: SI Horas_Online > 3.5  Y  Compras_Previas <= 1.0")
+print("       ENTONCES Cliente = IGNORA_EL_ANUNCIO")
+print("   R3: SI Horas_Online > 3.5  Y  Compras_Previas > 1.0")
+print("       ENTONCES Cliente = HACE_CLIC")
+
+
+# Motor de inferencia en acción: clasificar clientes nuevos
+clientes_nuevos = np.array([
+    [27,  7,  4],   # mucho tiempo online + historial de compras
+    [50,  6,  0],   # mucho tiempo online pero nunca ha comprado
+    [19,  1,  5],   # buen historial pero casi no se conecta
+])
+
+descripciones = [
+    "27 años, 7 h online, 4 compras previas",
+    "50 años, 6 h online, 0 compras previas",
+    "19 años, 1 h online, 5 compras previas",
+]
+
+print("\n" + "=" * 66)
+print("PREDICCIÓN SOBRE CLIENTES QUE EL MODELO NUNCA VIO")
+print("=" * 66)
+
+predicciones = arbol.predict(clientes_nuevos)
+probabilidades = arbol.predict_proba(clientes_nuevos)
+
+for desc, pred, prob in zip(descripciones, predicciones, probabilidades):
+    print(f"   {desc:<42} -> {nombres_clases[pred]}  "
+          f"(confianza {prob[pred]:.0%})")
+
+
+# --
+exactitud = arbol.score(X, Y)
+print("\n" + "=" * 66)
+print(f"   Exactitud sobre los datos de ENTRENAMIENTO: {exactitud:.0%}")
+print("   Ojo: este número no demuestra nada. El árbol ya vio estas 14 filas.")
+print("   Para evaluar de verdad hace falta un conjunto de prueba aparte")
+print("   (train_test_split) o validación cruzada (cross_val_score).")
+print("=" * 66)
